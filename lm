@@ -5,12 +5,14 @@ help() {
 Usage:
   lm <macro-name> <args...>
     Runs the macro with the given name and arguments.
+  lm [-c | --create] <macro-name>
+    Creates a new macro with the given name in the current directory.
   lm [-l | --list]
     Lists all macros in the current directory and parent directories.
-  lm [-h | --help]
-    Shows this help message.
   lm [-r | --resolve] <macro-name>
     Recursively resolves the given macro name to the script path.
+  lm [-h | --help]
+    Shows this help message.
 EOF
 }
 
@@ -79,16 +81,33 @@ call_macro() {
     echo "calling $macro_name from $macro_dir" >&2
     env LM_CALL_DIR="$call_dir" LM_MACRO_DIR="$macro_dir" LM_MACRO="$macro_name" $macro_path "$@"
     return $?
-}   
+}
+
+ensure_macro_dir() {
+    if [ ! -d "$MACRO_DIR_NAME" ]; then
+        echo "Creating macro directory $MACRO_DIR_NAME in $(pwd)" >&2
+        mkdir $MACRO_DIR_NAME
+    fi
+}
+
+create_macro() {
+    ensure_macro_dir
+
+    local macro_name=$1
+    local macro_path="$MACRO_DIR_NAME/$macro_name"
+
+    touch $macro_path
+    chmod +x $macro_path
+    echo "Macro $macro_name created at $macro_path"
+    if [ -n "$EDITOR" ]; then
+        $EDITOR $macro_path
+    fi
+}
 
 main() {
     case $1 in
         -l | --list)
             list_macros
-            return 0
-            ;;
-        -h | --help)
-            help
             return 0
             ;;
         -r | --resolve)
@@ -98,6 +117,18 @@ main() {
             fi
             resolve $2
             return $?
+            ;;
+        -c | --create)
+            if [ -z "$2" ]; then
+                echo "Macro name is required"
+                return 1
+            fi
+            create_macro $2
+            return $?
+            ;;
+        -h | --help)
+            help
+            return 0
             ;;
         *)
             if [ -z "$1" ]; then
