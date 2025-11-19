@@ -3,16 +3,18 @@
 help() {
     cat <<EOF
 Usage:
+  lm | lm [-l | --list]
+    Lists all macros in the current directory and parent directories.
   lm macro-name [args...]
     Runs the macro with the given name and arguments.
   lm [-c | --create] macro-name
     Creates a new macro with the given name in the current directory.
-  lm [-l | --list]
-    Lists all macros in the current directory and parent directories.
   lm [-r | --resolve] macro-name
     Recursively resolves the given macro name to the script path.
   lm [-h | --help]
     Shows this help message.
+  lm --completion
+    Prints a completion script for the current shell that can be sourced to enable tab completion.
 EOF
 }
 
@@ -53,7 +55,9 @@ list_macros() {
     local seen_names=()
     while true; do
         if [ -d "$current_dir/$MACRO_DIR_NAME" ]; then
+            # this will skip over hidden files, but running `lm .hidden-macro` will run a macro named `.hidden-macro` if it exists
             for macro_path in "$current_dir/$MACRO_DIR_NAME"/*; do
+                [[ -e "$macro_path" ]] || break
                 macro_name=$(basename "$macro_path")
                 if [ ! -x "$macro_path" ]; then
                     echo "[!] $macro_name (from $current_dir) is not executable"
@@ -73,6 +77,9 @@ list_macros() {
         fi
         current_dir=$(dirname "$current_dir")
     done
+    if [ ${#seen_names[@]} -eq 0 ]; then
+        echo "No macros found"
+    fi
 }
 
 call_macro() {
@@ -110,6 +117,53 @@ create_macro() {
     fi
 }
 
+print_completion() {
+    if [ "$1" == "zsh" ]; then
+        _print_completion_zsh
+        return 0
+    # elif [ -n "$BASH" ]; then
+    #     _print_completion_bash
+    #     return 0
+    else
+        echo "Unsupported shell"
+        return 1
+    fi
+}
+
+# TODO add ability to complete shell name after --completion, macro name after -r
+_print_completion_zsh() {
+    cat <<EOF
+# run this with: source <(lm --completion zsh)
+_lm_completion() {
+    local operations macros ret=1
+
+    operations=(
+        + '(operation)' \
+        {-l,--list}'[list macros]:->operation' \
+        {-c,--create}'[create a new macro]:->operation' \
+        {-r,--resolve}'[resolve the location of a macro with the given name]' \
+        --completion'[print completion script]:->operation'\
+        {-h,--help}'[show help]:->operation'
+    )
+
+    if [ "\$STATE" != 'operation' ]; then
+        macros=\$(list_macros)
+        if [ -n "\$macros" ]; then
+            macros=\$(echo "\$macros" | grep -v '[!]' | sed 's/ *\([^ ]\+\) (\(.*\))/\1\\:"\2"/')
+
+            operations+=( + '(macro)' :macro:"((\$macros))" )
+        fi
+    fi
+
+    _arguments -A "-*" "\${operations[@]}" && ret=0
+
+    return \$ret
+}
+
+compdef _lm_completion lm
+EOF
+}
+
 main() {
     case $1 in
         -l | --list)
@@ -134,6 +188,10 @@ main() {
             ;;
         -h | --help)
             help
+            return 0
+            ;;
+        --completion)
+            print_completion "$2"
             return 0
             ;;
         *)
