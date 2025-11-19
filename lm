@@ -118,16 +118,24 @@ create_macro() {
 }
 
 print_completion() {
-    if [ "$1" == "zsh" ]; then
-        _print_completion_zsh
-        return 0
-    # elif [ -n "$BASH" ]; then
-    #     _print_completion_bash
-    #     return 0
-    else
-        echo "Unsupported shell"
+    if [ -z "$1" ]; then
+        echo "Must specify a shell. Supported shells: zsh"
         return 1
     fi
+    case $1 in
+        zsh)
+            _print_completion_zsh
+            return 0
+        ;;
+        # bash)
+        #     _print_completion_bash
+        #     return 0
+        # ;;
+        *)
+            echo "Unsupported shell: $1"
+            return 1
+        ;;
+    esac
 }
 
 # TODO add ability to complete shell name after --completion, macro name after -r
@@ -147,7 +155,7 @@ _lm_completion() {
     )
 
     if [ "\$STATE" != 'operation' ]; then
-        macros=\$(list_macros)
+        macros=\$(lm -l)
         if [ -n "\$macros" ]; then
             macros=\$(echo "\$macros" | grep -v '[!]' | sed 's/ *\([^ ]\+\) (\(.*\))/\1\\:"\2"/')
 
