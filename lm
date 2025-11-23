@@ -64,9 +64,9 @@ list_macros() {
                     continue
                 fi
                 # this will probably break if the macro name contains a space but why would you do that??
-                if ! [[ "${seen_names[*]}" == *"$macro_name"* ]]; then
+                if ! [[ "${seen_names[*]}" =~ (^|[[:space:]])"$macro_name"([[:space:]]|$) ]]; then
                     echo "    $macro_name (from $current_dir)"
-                    seen_names+=("$macro_path")
+                    seen_names+=("$macro_name")
                 else
                     echo "[!] $macro_name (from $current_dir) is shadowed"
                 fi
@@ -83,17 +83,13 @@ list_macros() {
 }
 
 call_macro() {
-    local macro_path=$1
+    local macro_path=$1 call_dir macro_dir macro_name
     shift
-    local call_dir
     call_dir=$(pwd)
-    local macro_dir
     macro_dir=$(dirname "$(dirname "$macro_path")")
-    local macro_name
     macro_name=$(basename "$macro_path")
     echo "calling $macro_name from $macro_dir" >&2
     env LM_CALL_DIR="$call_dir" LM_MACRO_DIR="$macro_dir" LM_MACRO="$macro_name" "$macro_path" "$@"
-    return $?
 }
 
 ensure_macro_dir() {
